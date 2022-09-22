@@ -1,6 +1,7 @@
 globals [
   punch-damage
   kick-damage
+  jump-kick-damage
   score
   game-start?
   game-over?
@@ -16,6 +17,21 @@ turtles-own [
 badguys-own [
   strategy        ;text that indicates what the badguys current strategy is
   strategy-timer  ;a timer that counts down before the strategy is cleared
+]
+
+warriors-own [
+  move1 ;these track a history of moves to be used for cheat codes (think left left right right up down up down a b b a)
+  move2
+  move3
+  move4
+  move5
+  move6
+  move7
+  move8
+  move9
+  move10
+  move11
+  move12
 ]
 
 to setup
@@ -36,6 +52,7 @@ to setup
   ;setup damage amounts
   set punch-damage 1
   set kick-damage 2
+  set jump-kick-damage 3
 
   ;init score
   set score 0
@@ -47,6 +64,18 @@ to setup
     setxy -28 -8
     set size 15
     set heading 90
+    set move1 ""
+    set move2 ""
+    set move3 ""
+    set move4 ""
+    set move5 ""
+    set move6 ""
+    set move7 ""
+    set move8 ""
+    set move9 ""
+    set move10 ""
+    set move11 ""
+    set move12 ""
   ]
 
   create-badguys 1 [
@@ -133,7 +162,11 @@ to fight
     ;kick
     if badguy-action = 8 [
       ask one-of badguys [
-        if any? warriors in-radius 12 [badguy-kick]
+        ifelse random 10 >= 3 [
+          if any? warriors in-radius 12 [badguy-kick]
+        ][
+          if any? warriors in-radius 15 [badguy-jump-kick]
+        ]
       ]
     ]
 
@@ -243,6 +276,27 @@ to update-screen
 
 end
 
+to update-move-chain [new-move]
+
+  ;this tracks the last 12 moves.  This is used for cheat codes and special combo moves
+  ask one-of warriors [
+
+    set move12 move11
+    set move11 move10
+    set move10 move9
+    set move9 move8
+    set move8 move7
+    set move7 move6
+    set move6 move5
+    set move5 move4
+    set move4 move3
+    set move3 move2
+    set move2 move1
+    set move1 new-move
+  ]
+
+end
+
 
 
 ;************
@@ -250,7 +304,10 @@ end
 ;************
 to right-walk
 
+
   if not game-over? [
+    update-move-chain "right-walk"
+
     ask one-of warriors [
       set heading 90
       set shape "warrior-walk1"
@@ -276,6 +333,7 @@ end
 to left-walk
 
   if not game-over? [
+    update-move-chain "left-walk"
     ask one-of warriors [
       set heading 270
       set shape "warrior-walk1"
@@ -298,15 +356,26 @@ to left-walk
 
 end
 
-to warrior-kick
+to warrior-jump-kick
+
+  ;this is a combo move.  To do you you go left, right then kick
 
   if not game-over? [
+
+    update-move-chain "warrior-jump-kick"
+
     wait 0.1
 
     ask one-of warriors [
-      set shape "warrior-kick1"
-      wait 0.25
-      set shape "warrior-kick2"
+      set heading 45
+      fd 2
+      set shape "warrior-jump-kick1"
+      wait 0.15
+      fd 2
+      set shape "warrior-jump-kick2"
+      set heading 90
+      fd 2
+      wait 0.15
 
       if any? badguys in-radius 10 with [health > 0] [
 
@@ -317,9 +386,9 @@ to warrior-kick
             set size size + 5
             wait 0.2
             set size size - 5
-            set health health - kick-damage
+            set health health - jump-kick-damage
           ]
-          set score score + (kick-damage * 100)
+          set score score + (jump-kick-damage * 100)
 
         ][
           ;miss
@@ -327,12 +396,18 @@ to warrior-kick
             set shape "badguy-block"
             wait 0.4
             set shape "badguy"
+            ifelse random 10 >= 5 [badguy-kick][badguy-punch]
           ]
         ]
       ]
 
       wait 0.1
-      set shape "warrior-kick1"
+      set heading 135
+      fd 1
+      set shape "warrior-jump-kick1"
+      set heading 180
+      fd 2
+      set heading 90
 
     ]
 
@@ -342,6 +417,7 @@ to warrior-kick
 
     ask one-of warriors [
       set shape "warrior"
+      set ycor -8
     ]
 
     update-screen
@@ -349,9 +425,70 @@ to warrior-kick
   ]
 end
 
+to warrior-kick
+
+  if not game-over? [
+
+    ask one-of warriors [
+      ;check for the combo move, "jump kick" first
+      ifelse move1 = "right-walk" and move2 = "left-walk" [
+        warrior-jump-kick
+      ][
+        update-move-chain "warrior-kick"
+        wait 0.1
+
+        ask one-of warriors [
+          set shape "warrior-kick1"
+          wait 0.25
+          set shape "warrior-kick2"
+
+          if any? badguys in-radius 10 with [health > 0] [
+
+            ifelse random 10 > 5 [
+
+              ;hit
+              ask badguys [
+                set size size + 5
+                wait 0.2
+                set size size - 5
+                set health health - kick-damage
+              ]
+              set score score + (kick-damage * 100)
+
+            ][
+              ;miss
+              ask badguys [
+                set shape "badguy-block"
+                wait 0.4
+                set shape "badguy"
+              ]
+            ]
+          ]
+
+          wait 0.1
+          set shape "warrior-kick1"
+
+        ]
+
+
+
+        wait 0.25
+
+        ask one-of warriors [
+          set shape "warrior"
+        ]
+
+        update-screen
+        check-for-death
+      ]
+    ]
+  ]
+end
+
 to warrior-punch
 
   if not game-over? [
+    update-move-chain "warrior-punch"
     wait 0.1
 
     ask one-of warriors [
@@ -399,6 +536,71 @@ end
 ;*************
 ;badguy moves
 ;*************
+
+to badguy-jump-kick
+
+  if not game-over? [
+
+    wait 0.1
+
+    ask one-of badguys [
+      set heading 315
+      fd 2
+      set shape "badguy-kick1"
+      wait 0.15
+      fd 2
+      set shape "badguy-jump-kick"
+      set heading 270
+      fd 2
+      wait 0.15
+
+      if any? warriors in-radius 10 with [health > 0] [
+
+        ifelse random 10 > 5 [
+
+          ;hit
+          ask warriors [
+            set size size + 5
+            wait 0.2
+            set size size - 5
+            set health health - jump-kick-damage
+          ]
+          set score score + (jump-kick-damage * 100)
+
+        ][
+          ;miss
+          ask warriors [
+            set shape "warrior-block"
+            wait 0.4
+            set shape "warrior"
+          ]
+        ]
+      ]
+
+      wait 0.1
+      set heading 225
+      fd 1
+      set shape "badguy-kick1"
+      set heading 180
+      fd 2
+      set heading 270
+
+    ]
+
+
+
+    wait 0.25
+
+    ask one-of badguys [
+      set shape "badguy"
+      set ycor -8
+    ]
+
+    update-screen
+    check-for-death
+  ]
+end
+
 to badguy-punch
 
   wait 0.1
@@ -754,6 +956,31 @@ Polygon -2674135 true false 178 4 193 16 198 39 195 53 152 34 108 27 111 17 128 
 Polygon -16777216 true false 117 90 60 15 53 22 107 90
 Rectangle -16777216 true false 172 187 186 208
 Rectangle -16777216 true false 109 187 123 208
+
+badguy-jump-kick
+false
+0
+Rectangle -7500403 true true 128 79 173 94
+Polygon -2674135 true false 195 90 240 195 210 210 165 105
+Polygon -2674135 true false 150 90 135 195 90 180 105 90
+Circle -7500403 true true 110 5 80
+Polygon -2674135 true false 195 90 180 195 180 210 165 225 150 225 150 225 150 225 135 225 120 210 120 195 105 90
+Polygon -16777216 true false 180 90 195 90 120 195 120 165
+Line -6459832 false 191 105 161 105
+Line -6459832 false 178 125 149 117
+Line -6459832 false 163 143 141 134
+Line -6459832 false 142 179 119 158
+Line -6459832 false 154 160 131 146
+Rectangle -16777216 true false 120 193 180 201
+Polygon -2674135 true false 178 4 193 16 198 39 195 53 152 34 108 27 111 17 128 2 155 0
+Polygon -16777216 true false 117 90 60 15 53 22 107 90
+Rectangle -16777216 true false 172 187 186 208
+Rectangle -16777216 true false 109 187 123 208
+Polygon -2674135 true false 180 210 180 240 75 225 60 165 0 90 28 54 90 120 120 195
+Polygon -2674135 true false 165 210 180 240 240 300 180 300 135 255 120 225
+Line -16777216 false 180 240 120 210
+Line -16777216 false 95 136 118 190
+Line -16777216 false 126 122 121 164
 
 badguy-kick1
 false
@@ -1258,6 +1485,50 @@ Polygon -6459832 true false 122 4 107 16 102 39 105 53 148 34 192 27 189 17 172 
 Polygon -16777216 true false 183 90 240 15 247 22 193 90
 Rectangle -6459832 true false 114 187 128 208
 Rectangle -6459832 true false 177 187 191 208
+
+warrior-jump-kick1
+false
+0
+Rectangle -7500403 true true 127 79 172 94
+Polygon -10899396 true false 165 120 270 165 285 135 180 90
+Polygon -10899396 true false 135 120 30 165 15 135 120 90
+Circle -7500403 true true 110 5 80
+Polygon -10899396 true false 105 90 120 195 120 225 120 225 120 225 180 225 180 225 180 225 180 225 180 195 195 90
+Polygon -6459832 true false 120 90 105 90 180 195 180 165
+Line -6459832 false 109 105 139 105
+Line -6459832 false 122 125 151 117
+Line -6459832 false 137 143 159 134
+Line -6459832 false 158 179 181 158
+Line -6459832 false 146 160 169 146
+Rectangle -6459832 true false 120 193 180 201
+Polygon -6459832 true false 122 4 107 16 102 39 105 53 148 34 192 27 189 17 172 2 145 0
+Polygon -16777216 true false 213 180 225 180 225 180 223 180
+Rectangle -6459832 true false 114 187 128 208
+Rectangle -6459832 true false 177 187 191 208
+Polygon -10899396 true false 120 225 60 180 30 270 60 285 75 225 150 270 225 240 255 270 300 240 225 195 180 225
+
+warrior-jump-kick2
+false
+0
+Rectangle -7500403 true true 127 79 172 94
+Polygon -10899396 true false 210 15 165 120 195 135 240 30
+Polygon -10899396 true false 135 120 30 165 15 135 120 90
+Circle -7500403 true true 110 5 80
+Polygon -10899396 true false 105 90 120 195 120 225 120 225 120 225 180 225 180 225 180 225 180 225 180 195 195 90
+Polygon -6459832 true false 120 90 105 90 180 195 180 165
+Line -6459832 false 109 105 139 105
+Line -6459832 false 122 125 151 117
+Line -6459832 false 137 143 159 134
+Line -6459832 false 158 179 181 158
+Line -6459832 false 146 160 169 146
+Rectangle -6459832 true false 120 193 180 201
+Polygon -6459832 true false 122 4 107 16 102 39 105 53 148 34 192 27 189 17 172 2 145 0
+Polygon -16777216 true false 213 180 225 180 225 180 223 180
+Rectangle -6459832 true false 114 187 128 208
+Rectangle -6459832 true false 177 187 191 208
+Polygon -10899396 true false 120 225 90 225 75 240 90 270 150 270 150 270 240 240 300 255 300 210 225 210 180 225
+Line -16777216 false 135 240 165 240
+Line -16777216 false 165 240 180 255
 
 warrior-kick1
 false
